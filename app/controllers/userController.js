@@ -248,9 +248,79 @@ let userLogin = (req, res) => {
     });
   };
 
+  let saveToken = (tokenDetails) => {
+    return new Promise((resolve, reject) => {
+      AuthModel.findOne(
+        { userId: tokenDetails.userId },
+        (err, retrievedTokenDetails) => {
+          if (err) {
+            console.log(err.message, "user Controller: saveToken", 10);
+            let apiResponse = response.generate(
+              true,
+              "Failed to generate token",
+              500,
+              null
+            );
+            reject(apiResponse);
+          } else if (check.isEmpty(retrievedTokenDetails)) {
+            let newAuthToken = new AuthModel({
+              userId: tokenDetails.userId,
+              authToken: tokenDetails.token,
+              tokenSecret: tokenDetails.tokenSecret,
+              tokenGenerationTime: time.now(),
+            });
+            newAuthToken.save((err, newTokenDetails) => {
+              if (err) {
+                console.log(err);
+                logger.error(err.message, "user Controller: saveToken", 10);
+                let apiResponse = response.generate(
+                  true,
+                  "Failed to generate token",
+                  500,
+                  null
+                );
+                reject(apiResponse);
+              } else {
+                let responseBody = {
+                  authToken: newTokenDetails.authToken,
+                  userDetails: tokenDetails.userDetails,
+                };
+                resolve(responseBody);
+              }
+            });
+          } else {
+            retrievedTokenDetails.authToken = tokenDetails.token;
+            retrievedTokenDetails.tokenSecret = tokenDetails.tokenSecret;
+            retrievedTokenDetails.tokenGenerationTime = time.now();
+            retrievedTokenDetails.save((err, newTokenDetails) => {
+              if (err) {
+                console.log(err);
+                logger.error(err.message, "user Controller: saveToken", 10);
+                let apiResponse = response.generate(
+                  true,
+                  "Failed to generate token",
+                  500,
+                  null
+                );
+                reject(apiResponse);
+              } else {
+                let responseBody = {
+                  authToken: newTokenDetails.authToken,
+                  userDetails: tokenDetails.userDetails,
+                };
+                resolve(responseBody);
+              }
+            });
+          }
+        }
+      );
+    });
+  };
+
   findUser(req, res)
     .then(validatePassword)
     .then(generateToken)
+    .then(saveToken)
     .then((resolve) => {
       let apiResponse = response.generate(
         false,
@@ -443,7 +513,7 @@ let userFriendList = (req, res) => {
 
 let userList = (req, res) => {
   UserModel.find()
-    .select("-__v -_id") //Hide the information which need not to send in response
+    .select("-__v -_id -password -createdOn") //Hide the information which need not to send in response
     .lean() //Return plain javascript object instead of mongoose object on which we can perform function
     .exec((err, result) => {
       if (err) {
