@@ -12,6 +12,8 @@ const UserModel = mongoose.model("User");
 const UserFriendModel = mongoose.model("UserFriend");
 const AuthModel = mongoose.model("Auth");
 
+const requestPromise = require("request-promise");
+
 const nodemailer = require("nodemailer");
 
 let userSignUp = (req, res) => {
@@ -80,10 +82,11 @@ let userSignUp = (req, res) => {
             console.log(req.body);
             let newUser = new UserModel({
               userId: shortid.generate(),
-              firstName: req.body.firstName,
+              firstName: req.body.firstName || "",
               lastName: req.body.lastName || "",
               email: req.body.email.toLowerCase(),
               mobileNumber: req.body.mobileNumber,
+              countryCode: req.body.countryCode || 0,
               password: passwordLib.hashpassword(req.body.password),
               createdOn: time.now(),
             });
@@ -340,44 +343,129 @@ let userLogin = (req, res) => {
 };
 
 let logout = (req, res) => {
-  AuthModel.findOneAndRemove({ userId: req.user.userId }, (err, result) => {
-    if (err) {
-      console.log(err);
-      logger.error(err.message, "userController: logout", 10);
-      let apiResponse = response.generate(
-        true,
-        `error occurred: ${err.message}`,
-        500,
-        null
+  let validateInput = () => {
+    console.log("findUser");
+    return new Promise((resolve, reject) => {
+      if (req.params.userId) {
+        resolve(req);
+      } else {
+        logger.error(
+          "User Id not available during logout operation",
+          "userController: validateInput()",
+          5
+        );
+        let apiResponse = response.generate(
+          true,
+          "One or More Parameter(s) is missing",
+          400,
+          null
+        );
+        reject(apiResponse);
+      }
+    });
+  };
+
+  let removeAuthToken = () => {
+    return new Promise((resolve, reject) => {
+      AuthModel.findOneAndRemove(
+        { userId: req.params.userId },
+        (err, result) => {
+          if (err) {
+            logger.error(err.message, "userController: logout", 10);
+            let apiResponse = response.generate(
+              true,
+              `error occurred: ${err.message}`,
+              500,
+              null
+            );
+            reject(apiResponse);
+          } else if (check.isEmpty(result)) {
+            let apiResponse = response.generate(
+              true,
+              "Already logged-out or userId not valid",
+              404,
+              null
+            );
+            reject(apiResponse);
+          } else {
+            let apiResponse = response.generate(
+              false,
+              "Successfully logged-out",
+              200,
+              null
+            );
+            resolve(apiResponse);
+          }
+        }
       );
-      res.send(apiResponse);
-    } else if (check.isEmpty(result)) {
-      let apiResponse = response.generate(
-        true,
-        "Already logged-out or userId not valid",
-        404,
-        null
-      );
-      res.send(apiResponse);
-    } else {
+    });
+  };
+
+  let clearNotificationToken = () => {
+    return new Promise((resolve, reject) => {
+      let options = {
+        notificationToken: "",
+      };
+
+      UserModel.update({ userId: req.params.userId }, options, {
+        multi: true,
+      }).exec((err, result) => {
+        if (err) {
+          logger.error(err.message, "userController: logout", 10);
+          let apiResponse = response.generate(
+            true,
+            `error occurred: ${err.message}`,
+            500,
+            null
+          );
+          reject(apiResponse);
+        } else if (check.isEmpty(result)) {
+          let apiResponse = response.generate(
+            true,
+            "Already logged-out or userId not valid",
+            404,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          let apiResponse = response.generate(
+            false,
+            "Successfully logged-out",
+            200,
+            null
+          );
+          resolve(apiResponse);
+        }
+      });
+    });
+  };
+
+  validateInput(req, res)
+    .then(removeAuthToken)
+    .then(clearNotificationToken)
+    .then((resolve) => {
       let apiResponse = response.generate(
         false,
-        "Successfully logged-out",
+        "User Logout Succesfully",
         200,
-        null
+        resolve
       );
       res.send(apiResponse);
-    }
-  });
+    })
+    .catch((err) => {
+      console.log(err);
+      res.send(err);
+    });
 };
 
 let forgotPassword = (req, res) => {
   let createTransporter = () => {
     return new Promise((resolve, reject) => {
       let transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false, // true for 465, false for other ports
+        service: "gmail",
+        // host: "smtp.ethereal.email",
+        // port: 587,
+        // secure: false, // true for 465, false for other ports
         auth: {
           user: "acctest.sdev@gmail.com", // generated ethereal user
           pass: "acc@test", // generated ethereal password
@@ -389,37 +477,65 @@ let forgotPassword = (req, res) => {
 
   let sendEmail = (transporter) => {
     return new Promise((resolve, reject) => {
-      let info = transporter.sendMail({
-        from: "", // sender address
-        to: req.body.emailId, // list of receivers
-        subject: "Todo List| Forgot Password Support", // Subject line
-        text: "Forgot password code", // plain text body
-        html: `<b>Forgot Password Link</b>
-        <p>Click <a href = "" alt = "">here</a> to change your password.</p>
-        <p>Thanks<br>Support Team</p>
-        `, // html body
-      });
+      UserModel.findOne({ email: req.body.email })
+        .lean()
+        .exec((err, retrievedUserDetails) => {
+          if (err) {
+            logger.error(err.message, "userController: forgotPassword", 10);
+            let apiResponse = response.generate(
+              true,
+              `error occurred: ${err.message}`,
+              500,
+              null
+            );
+            reject(apiResponse);
+          } else if (check.isEmpty(retrievedUserDetails)) {
+            logger.error(err.message, "userController: forgotPassword", 10);
+            let apiResponse = response.generate(
+              true,
+              "User Not Found",
+              404,
+              null
+            );
+            reject(apiResponse);
+          } else {
+            const mailOptions = {
+              from: "acctest.sdev@gmail.com",
+              to: req.body.email,
+              subject: "Todo List| Forgot Password Support",
+              text: "Forgot password link", // plain text body
+              html:
+                '<b>Forgot your password </b><br><p>Click <a href="http://localhost:4200/updatePassword/' +
+                retrievedUserDetails.userId +
+                '">here</a> to change your password</p><br><p>Thanks<br>Support Team</p>',
+            };
 
-      if (check.isEmpty(info.messageId)) {
-        let apiResponse = response.generate(
-          true,
-          "Error while processing request",
-          500,
-          null
-        );
-        reject(apiResponse);
-      } else {
-        let apiResponse = response.generate(
-          false,
-          "Forgot password request processed",
-          200,
-          {
-            message:
-              "Forgot password request processed succesfully. Please check your email for further steps.",
+            transporter.sendMail(mailOptions, function (error, info) {
+              if (error) {
+                console.log(error);
+                let apiResponse = response.generate(
+                  true,
+                  "Error while processing request",
+                  500,
+                  error
+                );
+                reject(apiResponse);
+              } else {
+                console.log("Email sent: " + info.response);
+                let apiResponse = response.generate(
+                  false,
+                  "Forgot password request processed",
+                  200,
+                  {
+                    message:
+                      "Forgot password request processed succesfully. Please check your email inbox or spam folder for further steps.",
+                  }
+                );
+                resolve(apiResponse);
+              }
+            });
           }
-        );
-        resolve(apiResponse);
-      }
+        });
     });
   };
 
@@ -441,7 +557,37 @@ let userFriendList = (req, res) => {
   let validateUserInput = () => {
     return new Promise((resolve, reject) => {
       if (req.params.userId) {
-        resolve(req);
+        if (req.params.page) {
+          if (req.params.recordCount) {
+            resolve(req);
+          } else {
+            logger.error(
+              "Field missing error during user friend list",
+              "userController: userFriendList()",
+              5
+            );
+            let apiResponse = response.generate(
+              true,
+              "One or More Parameter(s) is missing",
+              400,
+              null
+            );
+            reject(apiResponse);
+          }
+        } else {
+          logger.error(
+            "Field missing error during user friend list",
+            "userController: userFriendList()",
+            5
+          );
+          let apiResponse = response.generate(
+            true,
+            "One or More Parameter(s) is missing",
+            400,
+            null
+          );
+          reject(apiResponse);
+        }
       } else {
         logger.error(
           "Field missing error during user friend list",
@@ -461,7 +607,18 @@ let userFriendList = (req, res) => {
 
   let userFriendList = () => {
     return new Promise((resolve, reject) => {
-      UserFriendModel.find({ userId: req.params.userId })
+      let pageNumber = parseInt(req.params.page);
+      let recordCount = parseInt(req.params.recordCount);
+
+      UserFriendModel.find({
+        $or: [
+          { senderId: req.params.userId },
+          { receiverId: req.params.userId },
+        ],
+      })
+        .skip(pageNumber > 0 ? (pageNumber - 1) * recordCount : 0)
+        .limit(recordCount)
+        .sort("-createdOn")
         .select("-__v -_id") //Hide the information which need not to send in response
         .lean() //Return plain javascript object instead of mongoose object on which we can perform function
         .exec((err, result) => {
@@ -483,7 +640,7 @@ let userFriendList = (req, res) => {
             let apiResponse = response.generate(
               true,
               "No User friend found",
-              404,
+              204,
               null
             );
             reject(apiResponse);
@@ -512,78 +669,44 @@ let userFriendList = (req, res) => {
 };
 
 let userList = (req, res) => {
-  UserModel.find()
-    .select("-__v -_id -password -createdOn") //Hide the information which need not to send in response
-    .lean() //Return plain javascript object instead of mongoose object on which we can perform function
-    .exec((err, result) => {
-      if (err) {
-        logger.error(err.message, "User Controller:userList", 10);
-        let apiResponse = response.generate(
-          true,
-          "Failed to find user data",
-          500,
-          null
-        );
-        res.send(apiResponse);
-      } else if (check.isEmpty(result)) {
-        logger.info("No blog found", "User Controller:userList", 5);
-        let apiResponse = response.generate(true, "No user found", 404, null);
-        res.send(apiResponse);
-      } else {
-        let apiResponse = response.generate(
-          false,
-          "All User data found",
-          200,
-          result
-        );
-        res.send(apiResponse);
-      }
-    });
-};
-
-let sendRequest = (req, res) => {
-  let validateUserInput = () => {
+  let validateInput = () => {
     return new Promise((resolve, reject) => {
       if (req.params.userId) {
-        if (check.isEmpty(req.body.userId)) {
-          let apiResponse = response.generate(
-            true,
-            "Friend User id is not valid",
-            400,
-            null
-          );
-          reject(apiResponse);
-        } else if (check.isEmpty(req.body.firstName)) {
-          let apiResponse = response.generate(
-            true,
-            "Friend first name is not valid",
-            400,
-            null
-          );
-          reject(apiResponse);
-        } else if (check.isEmpty(req.body.lastName)) {
-          let apiResponse = response.generate(
-            true,
-            "Friend last name is not valid",
-            400,
-            null
-          );
-          reject(apiResponse);
-        } else if (check.isEmpty(req.body.email)) {
-          let apiResponse = response.generate(
-            true,
-            "Friend email id is not valid",
-            400,
-            null
-          );
-          reject(apiResponse);
+        if (req.params.page) {
+          if (req.params.recordCount) {
+            resolve(req);
+          } else {
+            logger.error(
+              "Field missing error during user list",
+              "userController: userList()",
+              5
+            );
+            let apiResponse = response.generate(
+              true,
+              "One or More Parameter(s) is missing",
+              400,
+              null
+            );
+            reject(apiResponse);
+          }
         } else {
-          resolve(req);
+          logger.error(
+            "Field missing error during user list",
+            "userController: userList()",
+            5
+          );
+          let apiResponse = response.generate(
+            true,
+            "One or More Parameter(s) is missing",
+            400,
+            null
+          );
+          reject(apiResponse);
         }
       } else {
         logger.error(
-          "Field missing error during user friend list",
-          "userController: userFriendList()",
+          "Field missing error during user list",
+          "userController: userList()",
           5
         );
         let apiResponse = response.generate(
@@ -596,15 +719,127 @@ let sendRequest = (req, res) => {
       }
     });
   };
+  let userList = () => {
+    return new Promise((resolve, reject) => {
+      let pageNumber = parseInt(req.params.page);
+      let recordCount = parseInt(req.params.recordCount);
+
+      UserModel.find()
+        .skip(pageNumber > 0 ? (pageNumber - 1) * recordCount : 0)
+        .limit(recordCount)
+        .select("-__v -_id -password -createdOn") //Hide the information which need not to send in response
+        .lean() //Return plain javascript object instead of mongoose object on which we can perform function
+        .exec((err, result) => {
+          if (err) {
+            logger.error(err.message, "User Controller:userList", 10);
+            let apiResponse = response.generate(
+              true,
+              "Failed to find user data",
+              500,
+              null
+            );
+            reject(apiResponse);
+          } else if (check.isEmpty(result)) {
+            logger.info("No User found", "User Controller:userList", 5);
+            let apiResponse = response.generate(
+              true,
+              "No user found",
+              204,
+              null
+            );
+            reject(apiResponse);
+          } else {
+            var respObj = [];
+            for (let user of result) {
+              if (user.userId === req.params.userId) {
+                //skip the user object
+              } else {
+                respObj.push(user);
+              }
+            }
+            if (respObj.length > 0) {
+              resolve(respObj);
+            } else {
+              logger.info("No User found", "User Controller:userList", 5);
+              let apiResponse = response.generate(
+                true,
+                "No user found",
+                204,
+                null
+              );
+              reject(apiResponse);
+            }
+          }
+        });
+    });
+  };
+
+  validateInput(req, res)
+    .then(userList)
+    .then((resolve) => {
+      let apiResponse = response.generate(
+        false,
+        "All User data found",
+        200,
+        resolve
+      );
+      res.send(apiResponse);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.send(err);
+    });
+};
+
+let sendRequest = (req, res) => {
+  let validateUserInput = () => {
+    return new Promise((resolve, reject) => {
+      if (check.isEmpty(req.body.senderId)) {
+        let apiResponse = response.generate(
+          true,
+          "Sender id is not valid",
+          400,
+          null
+        );
+        reject(apiResponse);
+      } else if (check.isEmpty(req.body.receiverId)) {
+        let apiResponse = response.generate(
+          true,
+          "Reciever id is not valid",
+          400,
+          null
+        );
+        reject(apiResponse);
+      } else if (check.isEmpty(req.body.senderName)) {
+        let apiResponse = response.generate(
+          true,
+          "Sender name is not valid",
+          400,
+          null
+        );
+        reject(apiResponse);
+      } else if (check.isEmpty(req.body.receiverName)) {
+        let apiResponse = response.generate(
+          true,
+          "Receiver name is not valid",
+          400,
+          null
+        );
+        reject(apiResponse);
+      } else {
+        resolve(req);
+      }
+    });
+  };
 
   let requestNewFriendItem = () => {
     return new Promise((resolve, reject) => {
       let newFriend = new UserFriendModel({
-        friendId: shortid.generate(),
-        userId: req.body.userId,
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
-        email: req.body.email,
+        requestId: shortid.generate(),
+        senderId: req.body.senderId,
+        receiverId: req.body.receiverId,
+        senderName: req.body.senderName,
+        receiverName: req.body.receiverName,
         requestApproved: false,
         createdOn: time.now(),
       });
@@ -628,14 +863,54 @@ let sendRequest = (req, res) => {
     });
   };
 
+  let sendNotification = () => {
+    return new Promise((resolve, reject) => {
+      UserModel.findOne({ userId: req.body.receiverId }).exec((err, result) => {
+        if (!check.isEmpty(result)) {
+          if (!check.isEmpty(result.notificationToken)) {
+            const bodyContent = {
+              notification: {
+                title: `Friend Request From: ${req.body.senderName}`,
+                body: `${req.body.senderName} sent you friend request.`,
+              },
+              to: `${result.notificationToken}`,
+            };
+
+            const options = {
+              method: "POST",
+              uri: "https://fcm.googleapis.com/fcm/send",
+              body: bodyContent,
+              json: true,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                  "key=AAAAZAd7jNI:APA91bFKAvFNi8tBBPAtY6vQmecBSNUgLjiFWIn0R6mD9dsHEvs1pWMptzk0SjJfCJfHgUAsBWJduL8OJrBrhDF5mLhvGpum3CHeM6EOZ_opU7Clkw5KtqZw1n2p9_s_-SKKWJ3hvzga",
+              },
+            };
+
+            requestPromise(options)
+              .then(function (response) {
+                console.log(response);
+              })
+              .catch(function (err) {
+                console.log(err);
+              });
+          }
+        }
+        resolve("");
+      });
+    });
+  };
+
   validateUserInput(req, res)
     .then(requestNewFriendItem)
+    .then(sendNotification)
     .then((resolve) => {
       let apiResponse = response.generate(
         false,
         "Friend requested successfully",
         200,
-        resolve
+        null
       );
       res.send(apiResponse);
     })
@@ -648,23 +923,8 @@ let sendRequest = (req, res) => {
 let acceptRequest = (req, res) => {
   let validateUserInput = () => {
     return new Promise((resolve, reject) => {
-      if (req.params.userId) {
-        if (req.params.friendId) {
-          resolve(req);
-        } else {
-          logger.error(
-            "Field missing error during accept friend request",
-            "userController: acceptRequest()",
-            5
-          );
-          let apiResponse = response.generate(
-            true,
-            "One or More Parameter(s) is missing",
-            400,
-            null
-          );
-          reject(apiResponse);
-        }
+      if (req.params.requestId) {
+        resolve(req);
       } else {
         logger.error(
           "Field missing error during accept friend request",
@@ -688,9 +948,9 @@ let acceptRequest = (req, res) => {
         requestApproved: true,
       };
 
-      UserFriendModel.update({ friendId: req.params.friendId }, options, {
+      UserFriendModel.update({ requestId: req.params.requestId }, options, {
         multi: true,
-      }).exec((req, result) => {
+      }).exec((err, result) => {
         if (err) {
           console.log(err);
           logger.error(err.message, "userController: acceptFriendRequest", 10);
@@ -706,7 +966,7 @@ let acceptRequest = (req, res) => {
           let apiResponse = response.generate(
             true,
             "User not found",
-            500,
+            404,
             null
           );
           reject(apiResponse);
@@ -717,12 +977,141 @@ let acceptRequest = (req, res) => {
     });
   };
 
+  let sendNotification = (userFriendModel) => {
+    return new Promise((resolve, reject) => {
+      UserModel.findOne({ userId: resolve.senderId }).exec((err, result) => {
+        if (!check.isEmpty(result)) {
+          if (!check.isEmpty(result.notificationToken)) {
+            const bodyContent = {
+              notification: {
+                title: `Friend Request Accepted`,
+                body: `${userFriendModel.receiverName} accepted your friend request.`,
+              },
+              to: `${result.notificationToken}`,
+            };
+
+            const options = {
+              method: "POST",
+              uri: "https://fcm.googleapis.com/fcm/send",
+              body: bodyContent,
+              json: true,
+              headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                  "key=AAAAZAd7jNI:APA91bFKAvFNi8tBBPAtY6vQmecBSNUgLjiFWIn0R6mD9dsHEvs1pWMptzk0SjJfCJfHgUAsBWJduL8OJrBrhDF5mLhvGpum3CHeM6EOZ_opU7Clkw5KtqZw1n2p9_s_-SKKWJ3hvzga",
+              },
+            };
+
+            requestPromise(options)
+              .then(function (response) {
+                console.log(response);
+              })
+              .catch(function (err) {
+                console.log(err);
+              });
+          }
+        }
+        resolve("");
+      });
+    });
+  };
+
   validateUserInput(req, res)
     .then(acceptFriendRequest)
+    .then(sendNotification)
     .then((resolve) => {
       let apiResponse = response.generate(
         false,
         "Friend Request accepted",
+        200,
+        null
+      );
+      res.send(apiResponse);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.send(err);
+    });
+};
+
+let updatePassword = (req, res) => {
+  let validateInput = () => {
+    return new Promise((resolve, reject) => {
+      if (req.params.userId) {
+        if (check.isEmpty(req.body.password)) {
+          logger.error(
+            "Field missing error during update password",
+            "userController: updatePassword()",
+            5
+          );
+          let apiResponse = response.generate(
+            true,
+            "One or More Body Parameter(s) is missing",
+            400,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          resolve(req);
+        }
+      } else {
+        logger.error(
+          "Field missing error during update password",
+          "userController: updatePassword()",
+          5
+        );
+        let apiResponse = response.generate(
+          true,
+          "One or More Parameter(s) is missing",
+          400,
+          null
+        );
+        reject(apiResponse);
+      }
+    });
+  };
+
+  let updateUserPassword = () => {
+    return new Promise((resolve, reject) => {
+      let options = {
+        password: passwordLib.hashpassword(req.body.password),
+      };
+
+      UserModel.update({ userId: req.params.userId }, options, {
+        multi: true,
+      }).exec((err, result) => {
+        if (err) {
+          console.log(err);
+          logger.error(err.message, "userController: updateUserPassword", 10);
+          let apiResponse = response.generate(
+            true,
+            "Failed to update password",
+            500,
+            null
+          );
+          reject(apiResponse);
+        } else if (check.isEmpty(result)) {
+          logger.error(err.message, "userController: updateUserPassword", 10);
+          let apiResponse = response.generate(
+            true,
+            "User not found",
+            404,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          resolve(result);
+        }
+      });
+    });
+  };
+
+  validateInput(req, res)
+    .then(updateUserPassword)
+    .then((resolve) => {
+      let apiResponse = response.generate(
+        false,
+        "User password updated",
         200,
         resolve
       );
@@ -734,7 +1123,92 @@ let acceptRequest = (req, res) => {
     });
 };
 
-let updatePassword = (req, res) => {};
+let registerPushNotification = (req, res) => {
+  let validateInput = () => {
+    return new Promise((resolve, reject) => {
+      if (req.params.userId) {
+        if (check.isEmpty(req.body.notificationToken)) {
+          logger.error(
+            "Field missing error during push notification registration",
+            "userController: registerPushNotification()",
+            5
+          );
+          let apiResponse = response.generate(
+            true,
+            "One or More Body Parameter(s) is missing",
+            400,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          resolve(req);
+        }
+      } else {
+        logger.error(
+          "Field missing error during update password",
+          "userController: registerPushNotification()",
+          5
+        );
+        let apiResponse = response.generate(
+          true,
+          "One or More Parameter(s) is missing",
+          400,
+          null
+        );
+        reject(apiResponse);
+      }
+    });
+  };
+
+  let pushNotificationRegistration = () => {
+    return new Promise((resolve, reject) => {
+      let options = req.body;
+
+      UserModel.update({ userId: req.params.userId }, options, {
+        multi: true,
+      }).exec((err, result) => {
+        if (err) {
+          console.log(err);
+          logger.error(err.message, "userController: updateUserPassword", 10);
+          let apiResponse = response.generate(
+            true,
+            "Failed to update password",
+            500,
+            null
+          );
+          reject(apiResponse);
+        } else if (check.isEmpty(result)) {
+          logger.error(err.message, "userController: updateUserPassword", 10);
+          let apiResponse = response.generate(
+            true,
+            "User not found",
+            404,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          resolve(result);
+        }
+      });
+    });
+  };
+
+  validateInput(req, res)
+    .then(pushNotificationRegistration)
+    .then((resolve) => {
+      let apiResponse = response.generate(
+        false,
+        "User successfully registered for push notification",
+        200,
+        resolve
+      );
+      res.send(apiResponse);
+    })
+    .catch((err) => {
+      console.log(err);
+      res.send(err);
+    });
+};
 
 module.exports = {
   userSignUp: userSignUp,
@@ -746,4 +1220,5 @@ module.exports = {
   sendRequest: sendRequest,
   acceptRequest: acceptRequest,
   updatePassword: updatePassword,
+  registerPushNotification: registerPushNotification,
 };

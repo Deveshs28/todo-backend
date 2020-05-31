@@ -27,16 +27,20 @@ let userScheme = new Schema({
     default: "",
   },
   mobileNumber: {
-    type: Number,
-    default: 0,
+    type: String,
+    default: "",
   },
   countryCode: {
-    type: Number,
-    default: 0,
+    type: String,
+    default: "",
   },
   createdOn: {
     type: Date,
     default: time.getLocalTime(),
+  },
+  notificationToken: {
+    type: String,
+    default: "",
   },
 });
 

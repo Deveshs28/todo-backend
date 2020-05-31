@@ -9,9 +9,13 @@ const logger = require("./app/libs/loggerLib");
 const routeLoggerMiddleware = require("./app/middlewares/routeLogger");
 const globalErrorMiddleware = require("./app/middlewares/errorHandler");
 const mongoose = require("mongoose");
+var cors = require("cors");
 
 //Declaring an instance or creating an application instance
 const app = express();
+
+app.use(cors());
+app.options("*", cors());
 
 //middlewares
 app.use(bodyParser.json());
@@ -24,16 +28,6 @@ app.use(routeLoggerMiddleware.logIp);
 
 const modelsPath = "./app/models";
 const routesPath = "./app/routes";
-
-app.all("*", function (req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
-  );
-  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
-  next();
-});
 
 //Bootstrap models
 fs.readdirSync(modelsPath).forEach(function (file) {
@@ -60,6 +54,9 @@ console.log(appConfig);
 server.listen(appConfig.port);
 server.on("error", onError);
 server.on("listening", onListening);
+
+const socketLib = require("./app/libs/socketLib");
+const socketServer = socketLib.setServer(server);
 
 //Event listener for HTTP server 'error' event
 function onError(error) {

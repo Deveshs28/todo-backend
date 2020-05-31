@@ -4,25 +4,25 @@ const mongoose = require("mongoose"),
   Schema = mongoose.Schema;
 
 let userFriendScheme = new Schema({
-  friendId: {
+  requestId: {
     type: String,
     default: "",
     index: true,
     unique: true,
   },
-  userId: {
+  senderId: {
     type: String,
     default: "",
   },
-  firstName: {
+  receiverId: {
     type: String,
     default: "",
   },
-  lastName: {
+  senderName: {
     type: String,
     default: "",
   },
-  email: {
+  receiverName: {
     type: String,
     default: "",
   },

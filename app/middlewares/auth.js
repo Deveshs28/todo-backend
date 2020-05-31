@@ -34,7 +34,7 @@ let isAuthorized = (req, res, next) => {
           let apiResponse = responseLib.generate(
             true,
             "Invalid Or Expired authorizationToken",
-            404,
+            401,
             null
           );
           res.send(apiResponse);
@@ -48,7 +48,7 @@ let isAuthorized = (req, res, next) => {
                 let apiResponse = responseLib.generate(
                   true,
                   "Failed to authorize user",
-                  500,
+                  401,
                   null
                 );
                 res.send(apiResponse);
