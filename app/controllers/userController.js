@@ -719,8 +719,34 @@ let userList = (req, res) => {
       }
     });
   };
-  let userList = () => {
+
+  let userFriendList = () => {
     return new Promise((resolve, reject) => {
+      UserFriendModel.find({
+        $or: [
+          { senderId: req.params.userId },
+          { receiverId: req.params.userId },
+        ],
+      })
+        .sort("-createdOn")
+        .select("-__v -_id") //Hide the information which need not to send in response
+        .lean() //Return plain javascript object instead of mongoose object on which we can perform function
+        .exec((err, result) => {
+          let emptyResponse = [];
+          if (err) {
+            resolve(emptyResponse);
+          } else if (check.isEmpty(result)) {
+            resolve(emptyResponse);
+          } else {
+            resolve(result);
+          }
+        });
+    });
+  };
+  let userList = (userFriendModel) => {
+    return new Promise((resolve, reject) => {
+      console.log("userFriendModel: ", userFriendModel);
+      console.log("length: ", userFriendModel.length);
       let pageNumber = parseInt(req.params.page);
       let recordCount = parseInt(req.params.recordCount);
 
@@ -751,10 +777,28 @@ let userList = (req, res) => {
           } else {
             var respObj = [];
             for (let user of result) {
-              if (user.userId === req.params.userId) {
-                //skip the user object
+              if (userFriendModel.length > 0) {
+                for (let friendModel of userFriendModel) {
+                  if (user.userId === friendModel.senderId) {
+                    continue;
+                  }
+                  if (user.userId === friendModel.receiverId) {
+                    continue;
+                  } else {
+                    if (user.userId === req.params.userId) {
+                      continue;
+                      //skip the user object
+                    } else {
+                      respObj.push(user);
+                    }
+                  }
+                }
               } else {
-                respObj.push(user);
+                if (user.userId === req.params.userId) {
+                  //skip the user object
+                } else {
+                  respObj.push(user);
+                }
               }
             }
             if (respObj.length > 0) {
@@ -775,6 +819,7 @@ let userList = (req, res) => {
   };
 
   validateInput(req, res)
+    .then(userFriendList)
     .then(userList)
     .then((resolve) => {
       let apiResponse = response.generate(
