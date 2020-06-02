@@ -46,7 +46,7 @@
       "examples": [
         {
           "title": "Success-Response:",
-          "content": " {\n}",
+          "content": "         {\n  \"error\": false,\n  \"message\": \"Todo Item Detail Found\",\n  \"status\": 200,\n  \"data\": {\n    \"completed\": false,\n    \"createdBy\": \"3bD3SQ_xh\",\n    \"createdById\": \"Aman Sharrma\",\n    \"createdOn\": \"2020-06-01T07:00:15.000Z\",\n    \"itemId\": \"wIYPIJQ5v\",\n    \"lastUpdatedBy\": \"\",\n    \"lastUpdatedById\": \"\",\n    \"parentId\": \"\",\n    \"title\": \"Item 1 Edited\",\n    \"todoId\": \"vIuGOEt5m\",\n    \"updatedOn\": \"2020-05-31T17:36:38.000Z\"\n  }\n}",
           "type": "object"
         }
       ]
@@ -606,7 +606,7 @@
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "{\n    \"error\": false,\n    \"message\": \"Todo item updated\",\n    \"status\": 200,\n    \"data\": {\n        \"itemId\": \"cwItKhFPh\",\n        \"todoId\": \"sz5oZaNBG\",\n        \"parentId\": \"dEroa_s_l\",\n        \"title\": \"New Todo sub item edited again23\",\n        \"createdBy\": \"Devesh Sharma\",\n        \"createdById\": \"0yi8W5mVk\",\n        \"lastUpdatedBy\": \"\",\n        \"lastUpdatedById\": \"\",\n        \"createdOn\": \"2020-05-23T10:27:35.000Z\",\n        \"updatedOn\": \"2020-05-23T10:27:31.000Z\",\n        \"completed\": false,\n        \"_id\": \"5ec8fa97827e022a246f98ea\",\n        \"__v\": 0\n    }\n}",
+          "content": "{\n    \"error\": false,\n    \"message\": \"Todo item updated\",\n    \"status\": 200,\n    \"data\": null\n}",
           "type": "object"
         }
       ]
@@ -760,7 +760,7 @@
       "examples": [
         {
           "title": "Success-Response:",
-          "content": " {\n}",
+          "content": " {\n    \"error\": false,\n    \"message\": \"Undo Successfull\",\n    \"status\": 200,\n    \"data\": null\n}",
           "type": "object"
         }
       ]
@@ -848,6 +848,13 @@
     "parameter": {
       "fields": {
         "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "string",
+            "optional": false,
+            "field": "userId",
+            "description": "<p>userId of the user getting list. (path params) (required)</p>"
+          },
           {
             "group": "Parameter",
             "type": "string",
@@ -1284,7 +1291,7 @@
       "examples": [
         {
           "title": "Success-Response:",
-          "content": " {\n    \"error\": false,\n    \"message\": \"Friend requested successfully\",\n    \"status\": 200,\n    \"data\": {\n\n    }\n}",
+          "content": " {\n    \"error\": false,\n    \"message\": \"Friend requested successfully\",\n    \"status\": 200,\n    \"data\": null\n}",
           "type": "object"
         }
       ]
@@ -1340,7 +1347,7 @@
       "examples": [
         {
           "title": "Success-Response:",
-          "content": " {\n    \"error\": false,\n    \"message\": \"Friend Request accepted\",\n    \"status\": 200,\n    \"data\": {\n        \"n\": 1,\n        \"nModified\": 1,\n        \"ok\": 1\n    }\n}",
+          "content": " {\n    \"error\": false,\n    \"message\": \"Friend Request accepted\",\n    \"status\": 200,\n    \"data\": null\n}",
           "type": "object"
         }
       ]

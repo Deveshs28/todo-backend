@@ -34,7 +34,7 @@
     "description": "Api doc for todo list",
     "apidoc": {
       "title": "Todo list apiDoc",
-      "url": "http://localhost:3000"
+      "url": "https://api.epril-dev.co.in"
     }
   }
 }

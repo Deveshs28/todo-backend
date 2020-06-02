@@ -269,9 +269,7 @@ module.exports.setRouter = (app) => {
             "error": false,
             "message": "Friend requested successfully",
             "status": 200,
-            "data": {
-        
-            }
+            "data": null
         }
 
     */
@@ -297,11 +295,7 @@ module.exports.setRouter = (app) => {
             "error": false,
             "message": "Friend Request accepted",
             "status": 200,
-            "data": {
-                "n": 1,
-                "nModified": 1,
-                "ok": 1
-            }
+            "data": null
         }
     */
   app.put(
@@ -511,21 +505,7 @@ module.exports.setRouter = (app) => {
             "error": false,
             "message": "Todo item updated",
             "status": 200,
-            "data": {
-                "itemId": "cwItKhFPh",
-                "todoId": "sz5oZaNBG",
-                "parentId": "dEroa_s_l",
-                "title": "New Todo sub item edited again23",
-                "createdBy": "Devesh Sharma",
-                "createdById": "0yi8W5mVk",
-                "lastUpdatedBy": "",
-                "lastUpdatedById": "",
-                "createdOn": "2020-05-23T10:27:35.000Z",
-                "updatedOn": "2020-05-23T10:27:31.000Z",
-                "completed": false,
-                "_id": "5ec8fa97827e022a246f98ea",
-                "__v": 0
-            }
+            "data": null
         }
 
     */
@@ -692,7 +672,23 @@ module.exports.setRouter = (app) => {
      * 
      * @apiSuccessExample {object} Success-Response:
          {
-        }
+  "error": false,
+  "message": "Todo Item Detail Found",
+  "status": 200,
+  "data": {
+    "completed": false,
+    "createdBy": "3bD3SQ_xh",
+    "createdById": "Aman Sharrma",
+    "createdOn": "2020-06-01T07:00:15.000Z",
+    "itemId": "wIYPIJQ5v",
+    "lastUpdatedBy": "",
+    "lastUpdatedById": "",
+    "parentId": "",
+    "title": "Item 1 Edited",
+    "todoId": "vIuGOEt5m",
+    "updatedOn": "2020-05-31T17:36:38.000Z"
+  }
+}
     */
 
   app.get(
@@ -716,7 +712,12 @@ module.exports.setRouter = (app) => {
      * 
      * @apiSuccessExample {object} Success-Response:
          {
+            "error": false,
+            "message": "Undo Successfull",
+            "status": 200,
+            "data": null
         }
+
     */
   app.put(
     `${baseUrl}/todo/undoTodoItem/:itemId`,
