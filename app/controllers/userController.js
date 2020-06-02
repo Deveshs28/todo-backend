@@ -745,8 +745,6 @@ let userList = (req, res) => {
   };
   let userList = (userFriendModel) => {
     return new Promise((resolve, reject) => {
-      console.log("userFriendModel: ", userFriendModel);
-      console.log("length: ", userFriendModel.length);
       let pageNumber = parseInt(req.params.page);
       let recordCount = parseInt(req.params.recordCount);
 
@@ -775,28 +773,23 @@ let userList = (req, res) => {
             );
             reject(apiResponse);
           } else {
+            var friendIdModel = [];
+            if (userFriendModel.length > 0) {
+              for (let friendModel of userFriendModel) {
+                friendIdModel.push(friendModel.senderId);
+                friendIdModel.push(friendModel.receiverId);
+              }
+            }
             var respObj = [];
             for (let user of result) {
-              if (userFriendModel.length > 0) {
-                for (let friendModel of userFriendModel) {
-                  if (user.userId === friendModel.senderId) {
-                    continue;
-                  }
-                  if (user.userId === friendModel.receiverId) {
-                    continue;
-                  } else {
-                    if (user.userId === req.params.userId) {
-                      continue;
-                      //skip the user object
-                    } else {
-                      respObj.push(user);
-                    }
+              if (friendIdModel.length > 0) {
+                if (!friendIdModel.includes(user.userId)) {
+                  if (user.userId !== req.params.userId) {
+                    respObj.push(user);
                   }
                 }
               } else {
-                if (user.userId === req.params.userId) {
-                  //skip the user object
-                } else {
+                if (user.userId !== req.params.userId) {
                   respObj.push(user);
                 }
               }

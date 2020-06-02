@@ -16,7 +16,6 @@ let isAuthorized = (req, res, next) => {
       },
       (err, authDetails) => {
         if (err) {
-          console.log(err);
           logger.error(err.message, "Authorization-Middleware", 10);
           let apiResponse = responseLib.generate(
             true,

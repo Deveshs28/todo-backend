@@ -362,8 +362,39 @@ let addItemInTodo = (req, res) => {
     });
   };
 
+  let addTodoHistoryItem = (todoItemObject) => {
+    return new Promise((resolve, reject) => {
+      let newTodoHistory = new TodoItemHistoryModel({
+        itemId: shortid.generate(),
+        todoItemId: todoItemObject.itemId,
+        title: todoItemObject.title,
+        updatedBy: todoItemObject.createdBy,
+        updatedById: todoItemObject.createdById,
+        completed: false,
+        createdOn: time.now(),
+      });
+
+      newTodoHistory.save((err, newTodo) => {
+        if (err) {
+          console.log(err);
+          logger.error(err.message, "todoController: editTodoItem", 10);
+          let apiResponse = response.generate(
+            true,
+            "Failed to update Todo",
+            500,
+            null
+          );
+          reject(apiResponse);
+        } else {
+          resolve(todoItemObject);
+        }
+      });
+    });
+  };
+
   validateInput(req, res)
     .then(addNewTodoItem)
+    .then(addTodoHistoryItem)
     .then((resolve) => {
       let apiResponse = response.generate(
         false,
@@ -1058,11 +1089,11 @@ let undoTodoItem = (req, res) => {
 
   let findLastestHistoryRecord = () => {
     return new Promise((resolve, reject) => {
-      TodoItemHistoryModel.findOne({ todoItemId: req.params.itemId })
+      TodoItemHistoryModel.find({ todoItemId: req.params.itemId })
         .select("-__v -_id") //Hide the information which need not to send in response
         .lean() //Return plain javascript object instead of mongoose object on which we can perform function
         .sort({ createdOn: -1 })
-        .limit(1)
+        .limit(4)
         .exec((err, result) => {
           if (err) {
             logger.error(err.message, "todoController:itemHistory", 10);
@@ -1087,7 +1118,17 @@ let undoTodoItem = (req, res) => {
             );
             reject(apiResponse);
           } else {
-            resolve(result);
+            if (result.length > 1) {
+              resolve(result);
+            } else {
+              let apiResponse = response.generate(
+                true,
+                "No Todo history found",
+                204,
+                null
+              );
+              reject(apiResponse);
+            }
           }
         });
     });
@@ -1096,9 +1137,9 @@ let undoTodoItem = (req, res) => {
   let performUndoOperation = (todoHistoryItem) => {
     return new Promise((resolve, reject) => {
       let option;
-      if (todoHistoryItem.title === "Mark|-|-|Done") {
+      if (todoHistoryItem[0].title === "Mark|-|-|Done") {
         option = {
-          completed: todoHistoryItem.completed,
+          completed: todoHistoryItem[1].completed,
           updatedOn: time.getLocalTime(),
           lastUpdatedBy: req.body.userName,
           lastUpdatedById: req.body.userId,
@@ -1106,7 +1147,7 @@ let undoTodoItem = (req, res) => {
         //update complete status
       } else {
         option = {
-          title: todoHistoryItem.title,
+          title: todoHistoryItem[1].title,
           updatedOn: time.getLocalTime(),
           lastUpdatedBy: req.body.userName,
           lastUpdatedById: req.body.userId,
